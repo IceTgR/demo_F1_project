@@ -194,14 +194,14 @@ else:
         c1, c2, c3 = st.columns([1, 1, 2])
         
         with c1:
-            if st.button("🏎️ ADVANCE 1 LAP (Stay Out)", width=True):
+            if st.button("🏎️ ADVANCE 1 LAP (Stay Out)", width="stretch"):
                 advance_lap()
                 st.rerun()
                 
         with c2:
             st.markdown("**Box For:**")
             new_tire = st.radio("Select Compound", ["Soft", "Medium", "Hard"], horizontal=True, label_visibility="collapsed")
-            if st.button("🛠️ BOX NOW", type="primary", width=True):
+            if st.button("🛠️ BOX NOW", type="primary", width="stretch"):
                 advance_lap(pit_stop=True, new_compound=new_tire)
                 st.rerun()
 
@@ -210,7 +210,7 @@ else:
             your_row = standings_df[standings_df["Driver"] == "You"]
             your_position = int(your_row["Position"].iloc[0]) if not your_row.empty else 1
             st.metric("Current Position", f"P{your_position}")
-            st.dataframe(standings_df, width=True, hide_index=True)
+            st.dataframe(standings_df, width="stretch", hide_index=True)
                 
     else:
         st.success("🏁 RACE FINISHED!")
@@ -234,10 +234,10 @@ else:
             fig.add_trace(go.Scatter(x=pit_stops['Lap'], y=pit_stops['Lap Time (s)'], mode='markers', marker=dict(color='red', size=12, symbol='x'), name='Pit Stop'))
             
         fig.update_layout(xaxis_title="Lap", yaxis_title="Lap Time (Seconds)", template="plotly_dark", height=400)
-        st.plotly_chart(fig, width=True)
+        st.plotly_chart(fig, width="stretch")
         
         # Data Log
         with st.expander("Detailed Race Log"):
             log_df = df.copy()
             log_df["Lap Time"] = log_df["Lap Time (s)"].apply(format_time)
-            st.dataframe(log_df[["Lap", "Lap Time", "Tire Age", "Compound", "Event"]], width=True)
+            st.dataframe(log_df[["Lap", "Lap Time", "Tire Age", "Compound", "Event"]], width="stretch")
