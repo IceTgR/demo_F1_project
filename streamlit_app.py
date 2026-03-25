@@ -59,10 +59,14 @@ def build_standings_df():
         for opponent in st.session_state.opponents
     )
     standings_df = pd.DataFrame(standings_rows)
+    standings_df["Last Lap (s)"] = pd.to_numeric(standings_df["Last Lap (s)"], errors="coerce")
     standings_df = standings_df.sort_values("Last Lap (s)", na_position="last").reset_index(drop=True)
     standings_df["Position"] = standings_df.index + 1
     fastest_lap = standings_df["Last Lap (s)"].min()
-    standings_df["Gap To Fastest Lap (s)"] = (standings_df["Last Lap (s)"] - fastest_lap).round(2)
+    if pd.isna(fastest_lap):
+        standings_df["Gap To Fastest Lap (s)"] = np.nan
+    else:
+        standings_df["Gap To Fastest Lap (s)"] = (standings_df["Last Lap (s)"] - fastest_lap).round(2)
     standings_df["Last Lap"] = standings_df["Last Lap (s)"].apply(format_time)
     standings_df["Gap To Fastest Lap"] = standings_df["Gap To Fastest Lap (s)"].apply(format_time)
     return standings_df[["Position", "Driver", "Last Lap", "Gap To Fastest Lap"]]
