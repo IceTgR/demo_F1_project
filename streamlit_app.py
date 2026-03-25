@@ -28,26 +28,44 @@ def predict_safety_car():
     probability = 0.08 # 8% chance per lap for this simulation
     return random.random() < probability
 
+def format_time(seconds):
+    if seconds is None or pd.isna(seconds):
+        return "-"
+    total_seconds = float(seconds)
+    mins = int(total_seconds // 60)
+    secs = int(total_seconds % 60)
+    hundredths = int(round((total_seconds - int(total_seconds)) * 100))
+    if hundredths == 100:
+        hundredths = 0
+        secs += 1
+    if secs == 60:
+        secs = 0
+        mins += 1
+    return f"{mins:02d}:{secs:02d}.{hundredths:02d}"
+
 def create_mock_opponents():
     return [
-        {"Driver": "Max Verstappen", "Compound": "Medium", "Tire Age": 1, "Total Time": 0.0, "Next Pit Lap": random.randint(14, 20), "Pace Bias": -0.35},
-        {"Driver": "Lando Norris", "Compound": "Medium", "Tire Age": 1, "Total Time": 0.0, "Next Pit Lap": random.randint(14, 20), "Pace Bias": -0.1},
-        {"Driver": "Charles Leclerc", "Compound": "Medium", "Tire Age": 1, "Total Time": 0.0, "Next Pit Lap": random.randint(14, 20), "Pace Bias": 0.05},
-        {"Driver": "Lewis Hamilton", "Compound": "Medium", "Tire Age": 1, "Total Time": 0.0, "Next Pit Lap": random.randint(14, 20), "Pace Bias": 0.15},
+        {"Driver": "Max Verstappen", "Compound": "Medium", "Tire Age": 1, "Total Time": 0.0, "Last Lap Time": None, "Next Pit Lap": random.randint(14, 20), "Pace Bias": -0.35},
+        {"Driver": "Lando Norris", "Compound": "Medium", "Tire Age": 1, "Total Time": 0.0, "Last Lap Time": None, "Next Pit Lap": random.randint(14, 20), "Pace Bias": -0.1},
+        {"Driver": "Charles Leclerc", "Compound": "Medium", "Tire Age": 1, "Total Time": 0.0, "Last Lap Time": None, "Next Pit Lap": random.randint(14, 20), "Pace Bias": 0.05},
+        {"Driver": "Lewis Hamilton", "Compound": "Medium", "Tire Age": 1, "Total Time": 0.0, "Last Lap Time": None, "Next Pit Lap": random.randint(14, 20), "Pace Bias": 0.15},
     ]
 
 def build_standings_df():
-    standings_rows = [{"Driver": "You", "Total Time (s)": st.session_state.total_race_time}]
+    your_last_lap = st.session_state.history[-1]["Lap Time (s)"] if st.session_state.history else None
+    standings_rows = [{"Driver": "You", "Last Lap (s)": your_last_lap}]
     standings_rows.extend(
-        {"Driver": opponent["Driver"], "Total Time (s)": opponent["Total Time"]}
+        {"Driver": opponent["Driver"], "Last Lap (s)": opponent["Last Lap Time"]}
         for opponent in st.session_state.opponents
     )
-    standings_df = pd.DataFrame(standings_rows).sort_values("Total Time (s)").reset_index(drop=True)
+    standings_df = pd.DataFrame(standings_rows)
+    standings_df = standings_df.sort_values("Last Lap (s)", na_position="last").reset_index(drop=True)
     standings_df["Position"] = standings_df.index + 1
-    leader_time = standings_df.loc[0, "Total Time (s)"]
-    standings_df["Gap To Leader (s)"] = (standings_df["Total Time (s)"] - leader_time).round(2)
-    standings_df["Total Time (s)"] = standings_df["Total Time (s)"].round(2)
-    return standings_df[["Position", "Driver", "Total Time (s)", "Gap To Leader (s)"]]
+    fastest_lap = standings_df["Last Lap (s)"].min()
+    standings_df["Gap To Fastest Lap (s)"] = (standings_df["Last Lap (s)"] - fastest_lap).round(2)
+    standings_df["Last Lap"] = standings_df["Last Lap (s)"].apply(format_time)
+    standings_df["Gap To Fastest Lap"] = standings_df["Gap To Fastest Lap (s)"].apply(format_time)
+    return standings_df[["Position", "Driver", "Last Lap", "Gap To Fastest Lap"]]
 
 # --- 2. SESSION STATE MANAGEMENT (The "Game Engine") ---
 # We use st.session_state to remember the race data between button clicks.
@@ -111,6 +129,7 @@ def advance_lap(pit_stop=False, new_compound=None):
 
         opponent_lap_time += predict_tire_degradation(opponent["Tire Age"], opponent["Compound"])
         opponent["Total Time"] += opponent_lap_time
+        opponent["Last Lap Time"] = round(opponent_lap_time, 2)
         opponent["Tire Age"] += 1
     
     # Save lap data
@@ -148,10 +167,7 @@ else:
     with col3:
         st.metric(label="Current Compound", value=st.session_state.compound)
     with col4:
-        # Convert total seconds to MM:SS format
-        mins = int(st.session_state.total_race_time // 60)
-        secs = st.session_state.total_race_time % 60
-        st.metric(label="Total Race Time", value=f"{mins}m {secs:.1f}s")
+        st.metric(label="Total Race Time", value=format_time(st.session_state.total_race_time))
 
     st.divider()
 
@@ -178,22 +194,23 @@ else:
         c1, c2, c3 = st.columns([1, 1, 2])
         
         with c1:
-            if st.button("🏎️ ADVANCE 1 LAP (Stay Out)", use_container_width=True):
+            if st.button("🏎️ ADVANCE 1 LAP (Stay Out)", width=True):
                 advance_lap()
                 st.rerun()
                 
         with c2:
             st.markdown("**Box For:**")
             new_tire = st.radio("Select Compound", ["Soft", "Medium", "Hard"], horizontal=True, label_visibility="collapsed")
-            if st.button("🛠️ BOX NOW", type="primary", use_container_width=True):
+            if st.button("🛠️ BOX NOW", type="primary", width=True):
                 advance_lap(pit_stop=True, new_compound=new_tire)
                 st.rerun()
 
         with c3:
             standings_df = build_standings_df()
-            your_position = int(standings_df[standings_df["Driver"] == "You"]["Position"].iloc[0])
+            your_row = standings_df[standings_df["Driver"] == "You"]
+            your_position = int(your_row["Position"].iloc[0]) if not your_row.empty else 1
             st.metric("Current Position", f"P{your_position}")
-            st.dataframe(standings_df, use_container_width=True, hide_index=True)
+            st.dataframe(standings_df, width=True, hide_index=True)
                 
     else:
         st.success("🏁 RACE FINISHED!")
@@ -217,8 +234,10 @@ else:
             fig.add_trace(go.Scatter(x=pit_stops['Lap'], y=pit_stops['Lap Time (s)'], mode='markers', marker=dict(color='red', size=12, symbol='x'), name='Pit Stop'))
             
         fig.update_layout(xaxis_title="Lap", yaxis_title="Lap Time (Seconds)", template="plotly_dark", height=400)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width=True)
         
         # Data Log
         with st.expander("Detailed Race Log"):
-            st.dataframe(df.style.highlight_max(axis=0), use_container_width=True)
+            log_df = df.copy()
+            log_df["Lap Time"] = log_df["Lap Time (s)"].apply(format_time)
+            st.dataframe(log_df[["Lap", "Lap Time", "Tire Age", "Compound", "Event"]], width=True)
