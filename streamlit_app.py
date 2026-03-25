@@ -53,23 +53,24 @@ def create_mock_opponents():
 
 def build_standings_df():
     your_last_lap = st.session_state.history[-1]["Lap Time (s)"] if st.session_state.history else None
-    standings_rows = [{"Driver": "You", "Last Lap (s)": your_last_lap}]
+    standings_rows = [{"Driver": "You", "Total Time (s)": st.session_state.total_race_time, "Last Lap (s)": your_last_lap}]
     standings_rows.extend(
-        {"Driver": opponent["Driver"], "Last Lap (s)": opponent["Last Lap Time"]}
+        {
+            "Driver": opponent["Driver"],
+            "Total Time (s)": opponent["Total Time"],
+            "Last Lap (s)": opponent["Last Lap Time"],
+        }
         for opponent in st.session_state.opponents
     )
     standings_df = pd.DataFrame(standings_rows)
+    standings_df["Total Time (s)"] = pd.to_numeric(standings_df["Total Time (s)"], errors="coerce")
     standings_df["Last Lap (s)"] = pd.to_numeric(standings_df["Last Lap (s)"], errors="coerce")
-    standings_df = standings_df.sort_values("Last Lap (s)", na_position="last").reset_index(drop=True)
+    standings_df = standings_df.sort_values("Total Time (s)", na_position="last").reset_index(drop=True)
     standings_df["Position"] = standings_df.index + 1
-    fastest_lap = standings_df["Last Lap (s)"].min()
-    if pd.isna(fastest_lap):
-        standings_df["Gap To Fastest Lap (s)"] = np.nan
-    else:
-        standings_df["Gap To Fastest Lap (s)"] = (standings_df["Last Lap (s)"] - fastest_lap).round(2)
+    standings_df["Gap To Next Opponent (s)"] = standings_df["Total Time (s)"].diff().round(2)
     standings_df["Last Lap"] = standings_df["Last Lap (s)"].apply(format_time)
-    standings_df["Gap To Fastest Lap"] = standings_df["Gap To Fastest Lap (s)"].apply(format_time)
-    return standings_df[["Position", "Driver", "Last Lap", "Gap To Fastest Lap"]]
+    standings_df["Gap To Next Opponent"] = standings_df["Gap To Next Opponent (s)"].apply(format_time)
+    return standings_df[["Position", "Driver", "Last Lap", "Gap To Next Opponent"]]
 
 # --- 2. SESSION STATE MANAGEMENT (The "Game Engine") ---
 # We use st.session_state to remember the race data between button clicks.
