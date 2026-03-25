@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 from streamlit_autorefresh import st_autorefresh
 
 # --- PAGE CONFIGURATION ---
-st.set_page_config(page_title="F1 Strategy Commander 2026", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="F1 Strategy Commander", layout="wide", initial_sidebar_state="expanded")
 
 # --- 1. SIMULATED ML MODELS & LOGIC (For the ML Architect) ---
 def predict_tire_degradation(tire_age, compound):
